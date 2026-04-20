@@ -29,6 +29,31 @@ describe("evaluateRepository", () => {
     expect(report.checks.find((check) => check.id === "node-test-script")?.status).toBe("warn");
   });
 
+  it("adds next-step details for README and Node script fixes", async () => {
+    const report = evaluateRepository(
+      await scanRepository(join(fixturesPath, "minimal-repo"))
+    );
+
+    expect(report.checks.find((check) => check.id === "readme-installation")?.details).toContain(
+      "Add a second-level heading like \"## Installation\" and include the install command."
+    );
+    expect(report.checks.find((check) => check.id === "node-test-script")?.details).toContain(
+      "If this is a Node project, add a package.json script such as \"test\": \"vitest run\"."
+    );
+  });
+
+  it("warns when GitHub Actions does not run the package build script", async () => {
+    const report = evaluateRepository(
+      await scanRepository(join(fixturesPath, "ci-missing-build-repo"))
+    );
+
+    expect(report.checks.find((check) => check.id === "ci-build-command")).toMatchObject({
+      status: "warn",
+      message: "GitHub Actions does not run the build script."
+    });
+    expect(report.recommendations).toContain("Add npm run build to a GitHub Actions workflow.");
+  });
+
   it("can disable configured rules by id", async () => {
     const report = evaluateRepository(
       await scanRepository(join(fixturesPath, "minimal-repo")),

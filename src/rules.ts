@@ -40,7 +40,11 @@ export function evaluateRepository(scan: RepositoryScan, options: EvaluationOpti
       weight: 10,
       passMessage: "A GitHub Actions workflow exists.",
       failMessage: "No GitHub Actions workflow found.",
-      suggestion: "Add a CI workflow that runs tests and builds the project."
+      suggestion: "Add a CI workflow that runs tests and builds the project.",
+      details: [
+        "Create .github/workflows/ci.yml.",
+        "Run npm test and npm run build in the workflow."
+      ]
     }),
     binaryCheck({
       id: "readme-installation",
@@ -49,7 +53,10 @@ export function evaluateRepository(scan: RepositoryScan, options: EvaluationOpti
       weight: 10,
       passMessage: "README includes installation instructions.",
       failMessage: "README is missing installation instructions.",
-      suggestion: "Add an Installation section to README.md."
+      suggestion: "Add an Installation section to README.md.",
+      details: [
+        "Add a second-level heading like \"## Installation\" and include the install command."
+      ]
     }),
     binaryCheck({
       id: "readme-usage",
@@ -58,7 +65,10 @@ export function evaluateRepository(scan: RepositoryScan, options: EvaluationOpti
       weight: 10,
       passMessage: "README includes usage instructions.",
       failMessage: "README is missing usage instructions.",
-      suggestion: "Add a Usage section to README.md."
+      suggestion: "Add a Usage section to README.md.",
+      details: [
+        "Add a second-level heading like \"## Usage\" and show the primary command."
+      ]
     }),
     binaryCheck({
       id: "readme-testing",
@@ -67,7 +77,10 @@ export function evaluateRepository(scan: RepositoryScan, options: EvaluationOpti
       weight: 10,
       passMessage: "README explains how to run tests.",
       failMessage: "README is missing testing instructions.",
-      suggestion: "Add a Testing section to README.md."
+      suggestion: "Add a Testing section to README.md.",
+      details: [
+        "Add a second-level heading like \"## Testing\" and include the test command."
+      ]
     }),
     binaryCheck({
       id: "readme-examples",
@@ -76,11 +89,16 @@ export function evaluateRepository(scan: RepositoryScan, options: EvaluationOpti
       weight: 5,
       passMessage: "README includes command examples.",
       failMessage: "README has no fenced code examples.",
-      suggestion: "Add at least one command example to README.md."
+      suggestion: "Add at least one command example to README.md.",
+      details: [
+        "Add a fenced code block with a command users can copy and run."
+      ]
     }),
     packageMetadataCheck(scan),
     nodeScriptCheck(scan, "test", "node-test-script", "Node test script", "Add a test script to package.json."),
-    nodeScriptCheck(scan, "build", "node-build-script", "Node build script", "Add a build script to package.json.")
+    nodeScriptCheck(scan, "build", "node-build-script", "Node build script", "Add a build script to package.json."),
+    ciCommandCheck(scan, "test"),
+    ciCommandCheck(scan, "build")
   ], options.rules);
 
   const totalWeight = checks.reduce((sum, check) => sum + check.weight, 0);
@@ -141,6 +159,7 @@ function binaryCheck(input: {
   passMessage: string;
   failMessage: string;
   suggestion: string;
+  details?: string[];
 }): HealthCheck {
   return {
     id: input.id,
@@ -148,6 +167,7 @@ function binaryCheck(input: {
     status: input.passed ? "pass" : "fail",
     message: input.passed ? input.passMessage : input.failMessage,
     suggestion: input.passed ? undefined : input.suggestion,
+    details: input.passed ? undefined : input.details,
     weight: input.weight,
     points: input.passed ? input.weight : 0
   };
@@ -161,6 +181,9 @@ function packageMetadataCheck(scan: RepositoryScan): HealthCheck {
       status: "warn",
       message: "No package.json found; Node package checks are informational.",
       suggestion: "Add package metadata if this repository is distributed as a Node package.",
+      details: [
+        "Create package.json with at least name, version, scripts, and license fields for Node packages."
+      ],
       weight: 0,
       points: 0
     };
@@ -175,6 +198,10 @@ function packageMetadataCheck(scan: RepositoryScan): HealthCheck {
       ? "package.json includes name and version."
       : "package.json is missing name or version.",
     suggestion: hasMetadata ? undefined : "Add name and version fields to package.json.",
+    details: hasMetadata ? undefined : [
+      "Set package.json name to the package or repository name.",
+      "Set package.json version to the current package version."
+    ],
     weight: 5,
     points: hasMetadata ? 5 : 0
   };
@@ -193,6 +220,9 @@ function nodeScriptCheck(
       label,
       status: "warn",
       message: "No package.json found; this Node script check was skipped.",
+      details: [
+        `If this is a Node project, add a package.json script such as "${scriptName}": "${scriptName === "test" ? "vitest run" : "tsc -p tsconfig.json"}".`
+      ],
       weight: 0,
       points: 0
     };
@@ -209,7 +239,46 @@ function nodeScriptCheck(
       ? `package.json defines a ${scriptName} script.`
       : `package.json is missing a ${scriptName} script.`,
     suggestion: hasScript ? undefined : suggestion,
+    details: hasScript ? undefined : [
+      `Add "${scriptName}" to package.json scripts so local and CI checks can run the same command.`
+    ],
     weight,
     points: hasScript ? weight : 0
+  };
+}
+
+function ciCommandCheck(scan: RepositoryScan, scriptName: "test" | "build"): HealthCheck {
+  const id = `ci-${scriptName}-command`;
+  const label = scriptName === "test" ? "CI test command" : "CI build command";
+  const hasScript = Boolean(scan.packageJson?.scripts[scriptName]);
+
+  if (!hasScript || !scan.files.ciWorkflow) {
+    return {
+      id,
+      label,
+      status: "warn",
+      message: `CI ${scriptName} command check was skipped.`,
+      weight: 0,
+      points: 0
+    };
+  }
+
+  const hasCommand = scriptName === "test"
+    ? scan.ci.hasTestCommand
+    : scan.ci.hasBuildCommand;
+
+  return {
+    id,
+    label,
+    status: hasCommand ? "pass" : "warn",
+    message: hasCommand
+      ? `GitHub Actions runs the ${scriptName} script.`
+      : `GitHub Actions does not run the ${scriptName} script.`,
+    suggestion: hasCommand ? undefined : `Add npm run ${scriptName} to a GitHub Actions workflow.`,
+    details: hasCommand ? undefined : [
+      `Add a workflow step like "run: npm ${scriptName === "test" ? "test" : "run build"}".`
+    ],
+    weight: 0,
+    points: 0
   };
 }

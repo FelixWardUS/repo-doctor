@@ -71,6 +71,7 @@ export interface HealthCheck {
   status: CheckStatus;
   message: string;
   suggestion?: string;
+  details?: string[];
   weight: number;
   points: number;
 }

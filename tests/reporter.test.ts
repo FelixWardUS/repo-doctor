@@ -25,6 +25,10 @@ const report: HealthReport = {
       status: "warn",
       message: "No GitHub Actions workflow found.",
       suggestion: "Add a CI workflow that runs tests and builds the project.",
+      details: [
+        "Create .github/workflows/ci.yml.",
+        "Run npm test and npm run build in the workflow."
+      ],
       weight: 10,
       points: 0
     },
@@ -52,6 +56,8 @@ describe("reporters", () => {
     expect(output).toContain("Score: 72/100");
     expect(output).toContain("[PASS] README");
     expect(output).toContain("[WARN] CI workflow");
+    expect(output).toContain("  Next: Create .github/workflows/ci.yml.");
+    expect(output).toContain("  Next: Run npm test and npm run build in the workflow.");
     expect(output).toContain("[FAIL] License");
     expect(output).toContain("Recommendations");
   });
@@ -72,6 +78,7 @@ describe("reporters", () => {
     expect(output).toContain("| PASS | README | README.md exists. |");
     expect(output).toContain("| WARN | CI workflow | No GitHub Actions workflow found. |");
     expect(output).toContain("| FAIL | License | No LICENSE file found. |");
+    expect(output).toContain("- CI workflow: Create .github/workflows/ci.yml.");
     expect(output).toContain("## Recommendations");
     expect(output).toContain("- Add a LICENSE file so visitors know how the project can be used.");
   });

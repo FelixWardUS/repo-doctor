@@ -32,11 +32,11 @@ describe("scanRepository", () => {
       {
         path: ".github/workflows/ci.yml",
         hasTestCommand: true,
-        hasBuildCommand: false
+        hasBuildCommand: true
       }
     ]);
     expect(scan.ci.hasTestCommand).toBe(true);
-    expect(scan.ci.hasBuildCommand).toBe(false);
+    expect(scan.ci.hasBuildCommand).toBe(true);
     expect(scan.readme.headings).toEqual([
       "Healthy Node Repo",
       "Installation",

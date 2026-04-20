@@ -12,6 +12,9 @@ export function formatHumanReport(report: HealthReport): string {
 
   for (const check of report.checks) {
     lines.push(formatCheck(check));
+    for (const detail of check.details ?? []) {
+      lines.push(`  Next: ${detail}`);
+    }
   }
 
   lines.push("", "Recommendations:");
@@ -44,6 +47,14 @@ export function formatMarkdownReport(report: HealthReport): string {
 
   for (const check of report.checks) {
     lines.push(`| ${check.status.toUpperCase()} | ${escapeMarkdownTableCell(check.label)} | ${escapeMarkdownTableCell(check.message)} |`);
+  }
+
+  const nextSteps = report.checks.flatMap((check) => {
+    return (check.details ?? []).map((detail) => `- ${check.label}: ${detail}`);
+  });
+
+  if (nextSteps.length > 0) {
+    lines.push("", "## Next Steps", "", ...nextSteps);
   }
 
   lines.push("", "## Recommendations", "");
