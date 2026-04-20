@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import type { RepoDoctorConfig, ReportFormat } from "./types.js";
+import type { RepoDoctorConfig, ReportFormat, RuleConfig } from "./types.js";
 
 const configFileName = ".repo-doctor.json";
 
@@ -42,7 +42,47 @@ function parseConfig(raw: string): RepoDoctorConfig {
     config.failUnder = parsed.failUnder;
   }
 
+  if (parsed.rules !== undefined) {
+    if (!isRecord(parsed.rules)) {
+      throw new Error(`${configFileName} rules must be a JSON object.`);
+    }
+
+    config.rules = parseRules(parsed.rules);
+  }
+
   return config;
+}
+
+function parseRules(rawRules: Record<string, unknown>): Record<string, RuleConfig> {
+  const rules: Record<string, RuleConfig> = {};
+
+  for (const [id, rawRule] of Object.entries(rawRules)) {
+    if (!isRecord(rawRule)) {
+      throw new Error(`${configFileName} rule "${id}" must be a JSON object.`);
+    }
+
+    const rule: RuleConfig = {};
+
+    if (rawRule.enabled !== undefined) {
+      if (typeof rawRule.enabled !== "boolean") {
+        throw new Error(`${configFileName} rule "${id}" enabled must be a boolean.`);
+      }
+
+      rule.enabled = rawRule.enabled;
+    }
+
+    if (rawRule.weight !== undefined) {
+      if (!isRuleWeight(rawRule.weight)) {
+        throw new Error(`${configFileName} rule "${id}" weight must be an integer from 0 to 100.`);
+      }
+
+      rule.weight = rawRule.weight;
+    }
+
+    rules[id] = rule;
+  }
+
+  return rules;
 }
 
 function isReportFormat(value: unknown): value is ReportFormat {
@@ -50,6 +90,10 @@ function isReportFormat(value: unknown): value is ReportFormat {
 }
 
 function isScoreThreshold(value: unknown): value is number {
+  return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 100;
+}
+
+function isRuleWeight(value: unknown): value is number {
   return typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 100;
 }
 

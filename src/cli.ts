@@ -47,7 +47,9 @@ export async function runCli(
       const targetPath = resolve(cwd, target);
       const config = await loadConfig(targetPath);
       const scan = await scanRepository(targetPath);
-      const report = evaluateRepository(scan);
+      const report = evaluateRepository(scan, {
+        rules: config.rules
+      });
       const format = options.json ? "json" : options.format ?? config.format ?? "text";
       const failUnder = options.failUnder ?? config.failUnder;
       const output = formatReport(report, format);

@@ -28,4 +28,35 @@ describe("evaluateRepository", () => {
     expect(report.recommendations).toContain("Add an Installation section to README.md.");
     expect(report.checks.find((check) => check.id === "node-test-script")?.status).toBe("warn");
   });
+
+  it("can disable configured rules by id", async () => {
+    const report = evaluateRepository(
+      await scanRepository(join(fixturesPath, "minimal-repo")),
+      {
+        rules: {
+          license: {
+            enabled: false
+          }
+        }
+      }
+    );
+
+    expect(report.checks.map((check) => check.id)).not.toContain("license");
+    expect(report.recommendations).not.toContain("Add a LICENSE file so visitors know how the project can be used.");
+  });
+
+  it("can override configured rule weights", async () => {
+    const scan = await scanRepository(join(fixturesPath, "minimal-repo"));
+    const defaultReport = evaluateRepository(scan);
+    const weightedReport = evaluateRepository(scan, {
+      rules: {
+        license: {
+          weight: 50
+        }
+      }
+    });
+
+    expect(weightedReport.checks.find((check) => check.id === "license")?.weight).toBe(50);
+    expect(weightedReport.score).toBeLessThan(defaultReport.score);
+  });
 });

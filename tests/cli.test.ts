@@ -138,4 +138,35 @@ describe("runCli", () => {
       await rm(tempDir, { recursive: true, force: true });
     }
   });
+
+  it("uses configured rule overrides during a scan", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "repo-doctor-cli-"));
+    const stdout: string[] = [];
+
+    try {
+      await writeFile(join(tempDir, "README.md"), "# Minimal Repo\n");
+      await writeFile(join(tempDir, ".repo-doctor.json"), JSON.stringify({
+        rules: {
+          license: {
+            enabled: false
+          }
+        }
+      }));
+
+      const code = await runCli([
+        "node",
+        "repo-doctor",
+        "scan",
+        tempDir
+      ], {
+        stdout: (value) => stdout.push(value),
+        stderr: () => undefined
+      });
+
+      expect(code).toBe(0);
+      expect(stdout.join("")).not.toContain("[FAIL] License");
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
+  });
 });

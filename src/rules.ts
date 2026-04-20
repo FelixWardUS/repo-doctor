@@ -1,7 +1,11 @@
-import type { HealthCheck, HealthReport, RepositoryScan } from "./types.js";
+import type { HealthCheck, HealthReport, RepositoryScan, RuleConfig } from "./types.js";
 
-export function evaluateRepository(scan: RepositoryScan): HealthReport {
-  const checks: HealthCheck[] = [
+export interface EvaluationOptions {
+  rules?: Record<string, RuleConfig>;
+}
+
+export function evaluateRepository(scan: RepositoryScan, options: EvaluationOptions = {}): HealthReport {
+  const checks = applyRuleConfig([
     binaryCheck({
       id: "readme",
       label: "README",
@@ -77,7 +81,7 @@ export function evaluateRepository(scan: RepositoryScan): HealthReport {
     packageMetadataCheck(scan),
     nodeScriptCheck(scan, "test", "node-test-script", "Node test script", "Add a test script to package.json."),
     nodeScriptCheck(scan, "build", "node-build-script", "Node build script", "Add a build script to package.json.")
-  ];
+  ], options.rules);
 
   const totalWeight = checks.reduce((sum, check) => sum + check.weight, 0);
   const totalPoints = checks.reduce((sum, check) => sum + check.points, 0);
@@ -96,6 +100,37 @@ export function evaluateRepository(scan: RepositoryScan): HealthReport {
       .filter((check) => check.status !== "pass" && check.suggestion)
       .map((check) => check.suggestion as string)
   };
+}
+
+function applyRuleConfig(
+  checks: HealthCheck[],
+  rules: Record<string, RuleConfig> | undefined
+): HealthCheck[] {
+  if (!rules) {
+    return checks;
+  }
+
+  return checks.flatMap((check) => {
+    const rule = rules[check.id];
+
+    if (!rule) {
+      return [check];
+    }
+
+    if (rule.enabled === false) {
+      return [];
+    }
+
+    if (rule.weight === undefined) {
+      return [check];
+    }
+
+    return [{
+      ...check,
+      weight: rule.weight,
+      points: check.status === "pass" ? rule.weight : 0
+    }];
+  });
 }
 
 function binaryCheck(input: {

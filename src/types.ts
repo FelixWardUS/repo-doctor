@@ -4,6 +4,12 @@ export type ReportFormat = "text" | "json" | "markdown";
 export interface RepoDoctorConfig {
   format?: ReportFormat;
   failUnder?: number;
+  rules?: Record<string, RuleConfig>;
+}
+
+export interface RuleConfig {
+  enabled?: boolean;
+  weight?: number;
 }
 
 export interface PackageMetadata {

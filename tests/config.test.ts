@@ -11,12 +11,28 @@ describe("loadConfig", () => {
     try {
       await writeFile(join(tempDir, ".repo-doctor.json"), JSON.stringify({
         format: "markdown",
-        failUnder: 85
+        failUnder: 85,
+        rules: {
+          license: {
+            enabled: false
+          },
+          "readme-usage": {
+            weight: 20
+          }
+        }
       }));
 
       await expect(loadConfig(tempDir)).resolves.toEqual({
         format: "markdown",
-        failUnder: 85
+        failUnder: 85,
+        rules: {
+          license: {
+            enabled: false
+          },
+          "readme-usage": {
+            weight: 20
+          }
+        }
       });
     } finally {
       await rm(tempDir, { recursive: true, force: true });
