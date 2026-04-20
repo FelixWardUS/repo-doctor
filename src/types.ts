@@ -1,4 +1,10 @@
 export type CheckStatus = "pass" | "warn" | "fail";
+export type ReportFormat = "text" | "json" | "markdown";
+
+export interface RepoDoctorConfig {
+  format?: ReportFormat;
+  failUnder?: number;
+}
 
 export interface PackageMetadata {
   name?: string;

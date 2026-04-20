@@ -6,14 +6,14 @@ import { Command, CommanderError, InvalidArgumentError } from "commander";
 import { scanRepository } from "./scanner.js";
 import { evaluateRepository } from "./rules.js";
 import { formatHumanReport, formatJsonReport, formatMarkdownReport } from "./reporter.js";
+import { loadConfig } from "./config.js";
+import type { HealthReport, ReportFormat } from "./types.js";
 
 export interface CliIo {
   stdout: (value: string) => void;
   stderr: (value: string) => void;
   cwd?: string;
 }
-
-type ReportFormat = "text" | "json" | "markdown";
 
 export async function runCli(
   argv: string[] = process.argv,
@@ -44,14 +44,17 @@ export async function runCli(
     .option("--format <format>", "print text, json, or markdown output", parseReportFormat)
     .option("--fail-under <score>", "return exit code 1 when the score is below this threshold", parseScoreThreshold)
     .action(async (target: string, options: { json?: boolean; format?: ReportFormat; failUnder?: number }) => {
-      const scan = await scanRepository(resolve(cwd, target));
+      const targetPath = resolve(cwd, target);
+      const config = await loadConfig(targetPath);
+      const scan = await scanRepository(targetPath);
       const report = evaluateRepository(scan);
-      const format = options.json ? "json" : options.format ?? "text";
+      const format = options.json ? "json" : options.format ?? config.format ?? "text";
+      const failUnder = options.failUnder ?? config.failUnder;
       const output = formatReport(report, format);
       io.stdout(output);
 
-      if (typeof options.failUnder === "number" && report.score < options.failUnder) {
-        io.stderr(`Score is below threshold: expected at least ${options.failUnder}, got ${report.score}.\n`);
+      if (typeof failUnder === "number" && report.score < failUnder) {
+        io.stderr(`Score is below threshold: expected at least ${failUnder}, got ${report.score}.\n`);
         exitCode = 1;
       }
     });
@@ -70,7 +73,7 @@ export async function runCli(
   }
 }
 
-function formatReport(report: ReturnType<typeof evaluateRepository>, format: ReportFormat): string {
+function formatReport(report: HealthReport, format: ReportFormat): string {
   if (format === "json") {
     return `${formatJsonReport(report)}\n`;
   }

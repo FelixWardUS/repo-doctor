@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { runCli } from "../src/cli.js";
@@ -105,5 +107,35 @@ describe("runCli", () => {
     expect(code).toBe(0);
     expect(stdout.join("")).toContain("Score: 100/100");
     expect(stderr).toEqual([]);
+  });
+
+  it("uses config defaults for output format and fail-under threshold", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "repo-doctor-cli-"));
+    const stdout: string[] = [];
+    const stderr: string[] = [];
+
+    try {
+      await writeFile(join(tempDir, "README.md"), "# Minimal Repo\n");
+      await writeFile(join(tempDir, ".repo-doctor.json"), JSON.stringify({
+        format: "markdown",
+        failUnder: 80
+      }));
+
+      const code = await runCli([
+        "node",
+        "repo-doctor",
+        "scan",
+        tempDir
+      ], {
+        stdout: (value) => stdout.push(value),
+        stderr: (value) => stderr.push(value)
+      });
+
+      expect(code).toBe(1);
+      expect(stdout.join("")).toContain("# Repo Doctor");
+      expect(stderr.join("")).toContain("Score is below threshold: expected at least 80, got");
+    } finally {
+      await rm(tempDir, { recursive: true, force: true });
+    }
   });
 });
