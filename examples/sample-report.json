@@ -2,7 +2,7 @@
   "targetPath": "/path/to/project",
   "score": 100,
   "summary": {
-    "passed": 11,
+    "passed": 13,
     "warned": 0,
     "failed": 0
   },
@@ -94,6 +94,22 @@
       "message": "package.json defines a build script.",
       "weight": 5,
       "points": 5
+    },
+    {
+      "id": "ci-test-command",
+      "label": "CI test command",
+      "status": "pass",
+      "message": "GitHub Actions runs the test script.",
+      "weight": 0,
+      "points": 0
+    },
+    {
+      "id": "ci-build-command",
+      "label": "CI build command",
+      "status": "pass",
+      "message": "GitHub Actions runs the build script.",
+      "weight": 0,
+      "points": 0
     }
   ],
   "recommendations": []
