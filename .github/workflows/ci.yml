@@ -28,3 +28,6 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Repository health gate
+        run: node dist/cli.js scan . --format markdown --fail-under 90 >> "$GITHUB_STEP_SUMMARY"

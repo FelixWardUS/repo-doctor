@@ -10,7 +10,9 @@ A local repository health check CLI for README quality, licensing, CI readiness,
 - Reviews README sections for installation, usage, testing, and command examples
 - Detects `package.json` metadata when scanning Node projects
 - Checks Node `test` and `build` scripts only when `package.json` exists
-- Outputs either a terminal report or pretty JSON
+- Outputs terminal text, pretty JSON, or Markdown for GitHub summaries and PR comments
+- Fails CI below a configured score with `--fail-under`
+- Reads `.repo-doctor.json` for output defaults, score thresholds, and rule overrides
 - Includes focused unit tests and CI configuration
 
 ## Installation
@@ -53,6 +55,18 @@ Print JSON output:
 repo-doctor scan . --json
 ```
 
+Print Markdown output:
+
+```bash
+repo-doctor scan . --format markdown
+```
+
+Fail when a repository scores below a threshold:
+
+```bash
+repo-doctor scan . --fail-under 90
+```
+
 Run directly during development:
 
 ```bash
@@ -81,6 +95,45 @@ repo-doctor scan . --json
 ```
 
 See [examples/sample-report.json](examples/sample-report.json) for a full example.
+
+## CI Quality Gate
+
+Use `--fail-under` to make repository health part of CI:
+
+```bash
+repo-doctor scan . --format markdown --fail-under 90
+```
+
+In GitHub Actions, write the Markdown report to the job summary:
+
+```yaml
+- name: Repository health gate
+  run: repo-doctor scan . --format markdown --fail-under 90 >> "$GITHUB_STEP_SUMMARY"
+```
+
+This repository runs the local build output the same way in [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+
+## Configuration
+
+Create `.repo-doctor.json` in the repository being scanned to set defaults:
+
+```json
+{
+  "format": "markdown",
+  "failUnder": 90,
+  "rules": {
+    "license": {
+      "enabled": true,
+      "weight": 15
+    },
+    "readme-examples": {
+      "enabled": false
+    }
+  }
+}
+```
+
+Command-line options override config file defaults. Rule keys match check IDs in the report, such as `readme`, `license`, `ci-workflow`, `readme-usage`, `node-test-script`, and `node-build-script`.
 
 ## Scoring
 
@@ -116,12 +169,10 @@ npm run build
 
 ## Roadmap
 
-- Add configurable rule weights
-- Add Markdown output for pull request comments
 - Add support for Python and Rust project metadata
-- Add a `--fail-under` option for CI gates
+- Add dependency and package freshness checks
+- Add first-class npm publishing workflow
 
 ## License
 
 MIT
-# repo-doctor
