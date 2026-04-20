@@ -169,4 +169,55 @@ describe("runCli", () => {
       await rm(tempDir, { recursive: true, force: true });
     }
   });
+
+  it("includes dependency diagnostics only when requested", async () => {
+    const stdout: string[] = [];
+
+    const code = await runCli([
+      "node",
+      "repo-doctor",
+      "scan",
+      join(fixturesPath, "healthy-node-repo"),
+      "--include-dependencies"
+    ], {
+      stdout: (value) => stdout.push(value),
+      stderr: () => undefined,
+      dependencyRunner: async (args) => {
+        if (args[0] === "audit") {
+          return {
+            exitCode: 0,
+            stdout: JSON.stringify({
+              metadata: {
+                vulnerabilities: {
+                  info: 0,
+                  low: 0,
+                  moderate: 0,
+                  high: 0,
+                  critical: 0,
+                  total: 0
+                }
+              }
+            }),
+            stderr: ""
+          };
+        }
+
+        return {
+          exitCode: 1,
+          stdout: JSON.stringify({
+            vitest: {
+              current: "2.1.9",
+              wanted: "2.1.9",
+              latest: "4.1.4"
+            }
+          }),
+          stderr: ""
+        };
+      }
+    });
+
+    expect(code).toBe(0);
+    expect(stdout.join("")).toContain("[PASS] Dependency audit - npm audit found no vulnerabilities.");
+    expect(stdout.join("")).toContain("[WARN] Dependency freshness - npm outdated found 1 package behind latest.");
+  });
 });

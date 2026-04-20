@@ -12,6 +12,38 @@ export interface RuleConfig {
   weight?: number;
 }
 
+export interface CommandResult {
+  exitCode: number;
+  stdout: string;
+  stderr: string;
+}
+
+export type DependencyCommandRunner = (args: string[], cwd: string) => Promise<CommandResult>;
+
+export interface DependencyAuditSummary {
+  total: number;
+  bySeverity: {
+    info: number;
+    low: number;
+    moderate: number;
+    high: number;
+    critical: number;
+  };
+}
+
+export interface OutdatedDependency {
+  name: string;
+  current: string;
+  wanted: string;
+  latest: string;
+}
+
+export interface DependencyDiagnostics {
+  audit?: DependencyAuditSummary;
+  outdated?: OutdatedDependency[];
+  errors?: string[];
+}
+
 export interface PackageMetadata {
   name?: string;
   version?: string;

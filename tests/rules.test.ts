@@ -54,6 +54,42 @@ describe("evaluateRepository", () => {
     expect(report.recommendations).toContain("Add npm run build to a GitHub Actions workflow.");
   });
 
+  it("adds optional dependency risk checks when diagnostics are provided", async () => {
+    const report = evaluateRepository(
+      await scanRepository(join(fixturesPath, "healthy-node-repo")),
+      {
+        dependencyDiagnostics: {
+          audit: {
+            total: 3,
+            bySeverity: {
+              info: 0,
+              low: 1,
+              moderate: 2,
+              high: 0,
+              critical: 0
+            }
+          },
+          outdated: [
+            {
+              name: "commander",
+              current: "12.1.0",
+              wanted: "12.1.0",
+              latest: "14.0.3"
+            }
+          ]
+        }
+      }
+    );
+
+    expect(report.checks.find((check) => check.id === "dependencies-audit")).toMatchObject({
+      status: "warn",
+      message: "npm audit found 3 vulnerabilities."
+    });
+    expect(report.checks.find((check) => check.id === "dependencies-outdated")?.details).toContain(
+      "commander: current 12.1.0, latest 14.0.3."
+    );
+  });
+
   it("can disable configured rules by id", async () => {
     const report = evaluateRepository(
       await scanRepository(join(fixturesPath, "minimal-repo")),

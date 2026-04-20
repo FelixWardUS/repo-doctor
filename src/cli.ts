@@ -7,12 +7,14 @@ import { scanRepository } from "./scanner.js";
 import { evaluateRepository } from "./rules.js";
 import { formatHumanReport, formatJsonReport, formatMarkdownReport } from "./reporter.js";
 import { loadConfig } from "./config.js";
-import type { HealthReport, ReportFormat } from "./types.js";
+import { collectDependencyDiagnostics } from "./dependencies.js";
+import type { DependencyCommandRunner, HealthReport, ReportFormat } from "./types.js";
 
 export interface CliIo {
   stdout: (value: string) => void;
   stderr: (value: string) => void;
   cwd?: string;
+  dependencyRunner?: DependencyCommandRunner;
 }
 
 export async function runCli(
@@ -43,12 +45,22 @@ export async function runCli(
     .option("--json", "print JSON output")
     .option("--format <format>", "print text, json, or markdown output", parseReportFormat)
     .option("--fail-under <score>", "return exit code 1 when the score is below this threshold", parseScoreThreshold)
-    .action(async (target: string, options: { json?: boolean; format?: ReportFormat; failUnder?: number }) => {
+    .option("--include-dependencies", "include npm audit and outdated diagnostics")
+    .action(async (target: string, options: {
+      json?: boolean;
+      format?: ReportFormat;
+      failUnder?: number;
+      includeDependencies?: boolean;
+    }) => {
       const targetPath = resolve(cwd, target);
       const config = await loadConfig(targetPath);
       const scan = await scanRepository(targetPath);
+      const dependencyDiagnostics = options.includeDependencies && scan.packageJson
+        ? await collectDependencyDiagnostics(targetPath, io.dependencyRunner)
+        : undefined;
       const report = evaluateRepository(scan, {
-        rules: config.rules
+        rules: config.rules,
+        dependencyDiagnostics
       });
       const format = options.json ? "json" : options.format ?? config.format ?? "text";
       const failUnder = options.failUnder ?? config.failUnder;

@@ -1,7 +1,8 @@
-import type { HealthCheck, HealthReport, RepositoryScan, RuleConfig } from "./types.js";
+import type { DependencyDiagnostics, HealthCheck, HealthReport, RepositoryScan, RuleConfig } from "./types.js";
 
 export interface EvaluationOptions {
   rules?: Record<string, RuleConfig>;
+  dependencyDiagnostics?: DependencyDiagnostics;
 }
 
 export function evaluateRepository(scan: RepositoryScan, options: EvaluationOptions = {}): HealthReport {
@@ -98,7 +99,8 @@ export function evaluateRepository(scan: RepositoryScan, options: EvaluationOpti
     nodeScriptCheck(scan, "test", "node-test-script", "Node test script", "Add a test script to package.json."),
     nodeScriptCheck(scan, "build", "node-build-script", "Node build script", "Add a build script to package.json."),
     ciCommandCheck(scan, "test"),
-    ciCommandCheck(scan, "build")
+    ciCommandCheck(scan, "build"),
+    ...dependencyChecks(options.dependencyDiagnostics)
   ], options.rules);
 
   const totalWeight = checks.reduce((sum, check) => sum + check.weight, 0);
@@ -118,6 +120,80 @@ export function evaluateRepository(scan: RepositoryScan, options: EvaluationOpti
       .filter((check) => check.status !== "pass" && check.suggestion)
       .map((check) => check.suggestion as string)
   };
+}
+
+function dependencyChecks(diagnostics: DependencyDiagnostics | undefined): HealthCheck[] {
+  if (!diagnostics) {
+    return [];
+  }
+
+  const checks: HealthCheck[] = [];
+
+  if (diagnostics.audit) {
+    checks.push({
+      id: "dependencies-audit",
+      label: "Dependency audit",
+      status: diagnostics.audit.total === 0 ? "pass" : "warn",
+      message: diagnostics.audit.total === 0
+        ? "npm audit found no vulnerabilities."
+        : `npm audit found ${diagnostics.audit.total} vulnerabilities.`,
+      suggestion: diagnostics.audit.total === 0
+        ? undefined
+        : "Run npm audit and review the vulnerable dependency paths.",
+      details: diagnostics.audit.total === 0
+        ? undefined
+        : [
+          `Severity counts: ${formatAuditSeverityCounts(diagnostics.audit)}.`
+        ],
+      weight: 0,
+      points: 0
+    });
+  }
+
+  if (diagnostics.outdated) {
+    checks.push({
+      id: "dependencies-outdated",
+      label: "Dependency freshness",
+      status: diagnostics.outdated.length === 0 ? "pass" : "warn",
+      message: diagnostics.outdated.length === 0
+        ? "npm outdated found no packages behind latest."
+        : `npm outdated found ${diagnostics.outdated.length} ${diagnostics.outdated.length === 1 ? "package" : "packages"} behind latest.`,
+      suggestion: diagnostics.outdated.length === 0
+        ? undefined
+        : "Review npm outdated and plan safe dependency upgrades.",
+      details: diagnostics.outdated.length === 0
+        ? undefined
+        : diagnostics.outdated.slice(0, 5).map((dependency) => {
+          return `${dependency.name}: current ${dependency.current}, latest ${dependency.latest}.`;
+        }),
+      weight: 0,
+      points: 0
+    });
+  }
+
+  for (const error of diagnostics.errors ?? []) {
+    checks.push({
+      id: "dependencies-error",
+      label: "Dependency diagnostics",
+      status: "warn",
+      message: "Dependency diagnostics could not complete.",
+      details: [error],
+      weight: 0,
+      points: 0
+    });
+  }
+
+  return checks;
+}
+
+function formatAuditSeverityCounts(audit: NonNullable<DependencyDiagnostics["audit"]>): string {
+  return [
+    `critical ${audit.bySeverity.critical}`,
+    `high ${audit.bySeverity.high}`,
+    `moderate ${audit.bySeverity.moderate}`,
+    `low ${audit.bySeverity.low}`,
+    `info ${audit.bySeverity.info}`
+  ].join(", ");
 }
 
 function applyRuleConfig(
