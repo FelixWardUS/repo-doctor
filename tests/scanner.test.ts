@@ -19,11 +19,30 @@ describe("scanRepository", () => {
     expect(scan.packageJson).toEqual({
       name: "healthy-node-repo",
       version: "1.0.0",
+      description: undefined,
+      license: undefined,
       scripts: {
         build: "tsc -p tsconfig.json",
         test: "vitest run"
-      }
+      },
+      dependencies: {},
+      devDependencies: {}
     });
+    expect(scan.ci.workflows).toEqual([
+      {
+        path: ".github/workflows/ci.yml",
+        hasTestCommand: true,
+        hasBuildCommand: false
+      }
+    ]);
+    expect(scan.ci.hasTestCommand).toBe(true);
+    expect(scan.ci.hasBuildCommand).toBe(false);
+    expect(scan.readme.headings).toEqual([
+      "Healthy Node Repo",
+      "Installation",
+      "Usage",
+      "Testing"
+    ]);
     expect(scan.readme.sections).toEqual({
       installation: true,
       usage: true,
@@ -44,6 +63,12 @@ describe("scanRepository", () => {
       ciWorkflow: false
     });
     expect(scan.packageJson).toBeUndefined();
+    expect(scan.ci).toEqual({
+      workflows: [],
+      hasTestCommand: false,
+      hasBuildCommand: false
+    });
+    expect(scan.readme.headings).toEqual(["Minimal Repo"]);
     expect(scan.readme.sections.installation).toBe(false);
     expect(scan.readme.wordCount).toBeGreaterThan(0);
   });

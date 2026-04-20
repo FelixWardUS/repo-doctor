@@ -1,6 +1,6 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import type { PackageMetadata, ReadmeScan, RepositoryScan } from "./types.js";
+import type { CiScan, CiWorkflowFile, PackageMetadata, ReadmeScan, RepositoryScan } from "./types.js";
 
 const readmePattern = /^readme(?:\.(?:md|markdown|txt))?$/i;
 const licensePattern = /^(?:license|licence)(?:\.(?:md|txt))?$/i;
@@ -13,6 +13,7 @@ export async function scanRepository(targetPath: string): Promise<RepositoryScan
   const licenseFile = entries.some((entry) => licensePattern.test(entry));
   const hasGitignore = entries.includes(".gitignore");
   const hasPackageJson = entries.includes("package.json");
+  const ci = await scanGithubActionsWorkflows(absolutePath);
 
   return {
     targetPath: absolutePath,
@@ -21,11 +22,12 @@ export async function scanRepository(targetPath: string): Promise<RepositoryScan
       license: licenseFile,
       gitignore: hasGitignore,
       packageJson: hasPackageJson,
-      ciWorkflow: await hasGithubActionsWorkflow(absolutePath)
+      ciWorkflow: ci.workflows.length > 0
     },
     readme: readmeFile
       ? await scanReadme(join(absolutePath, readmeFile), readmeFile)
       : emptyReadmeScan(),
+    ci,
     packageJson: hasPackageJson
       ? await scanPackageJson(join(absolutePath, "package.json"))
       : undefined
@@ -36,13 +38,31 @@ async function readDirectoryNames(path: string): Promise<string[]> {
   return readdir(path);
 }
 
-async function hasGithubActionsWorkflow(targetPath: string): Promise<boolean> {
+async function scanGithubActionsWorkflows(targetPath: string): Promise<CiScan> {
   try {
     const workflowPath = join(targetPath, ".github", "workflows");
-    const workflows = await readdir(workflowPath);
-    return workflows.some((file) => /\.(?:ya?ml)$/i.test(file));
+    const workflowFiles = (await readdir(workflowPath))
+      .filter((file) => /\.(?:ya?ml)$/i.test(file))
+      .sort();
+    const workflows = await Promise.all(
+      workflowFiles.map(async (file): Promise<CiWorkflowFile> => {
+        const content = await readFile(join(workflowPath, file), "utf8");
+
+        return {
+          path: join(".github", "workflows", file),
+          hasTestCommand: hasCommand(content, "test"),
+          hasBuildCommand: hasCommand(content, "build")
+        };
+      })
+    );
+
+    return {
+      workflows,
+      hasTestCommand: workflows.some((workflow) => workflow.hasTestCommand),
+      hasBuildCommand: workflows.some((workflow) => workflow.hasBuildCommand)
+    };
   } catch {
-    return false;
+    return emptyCiScan();
   }
 }
 
@@ -53,6 +73,7 @@ async function scanReadme(path: string, filename: string): Promise<ReadmeScan> {
     path: filename,
     wordCount: countWords(content),
     hasCodeExamples: /```/.test(content),
+    headings: extractHeadings(content),
     sections: {
       installation: hasHeading(content, ["installation", "install", "setup"]),
       usage: hasHeading(content, ["usage", "getting started", "quick start"]),
@@ -67,23 +88,31 @@ async function scanPackageJson(path: string): Promise<PackageMetadata> {
   const parsed = JSON.parse(raw) as {
     name?: unknown;
     version?: unknown;
+    description?: unknown;
+    license?: unknown;
     scripts?: Record<string, unknown>;
+    dependencies?: Record<string, unknown>;
+    devDependencies?: Record<string, unknown>;
   };
 
   return {
     name: typeof parsed.name === "string" ? parsed.name : undefined,
     version: typeof parsed.version === "string" ? parsed.version : undefined,
-    scripts: normalizeScripts(parsed.scripts)
+    description: typeof parsed.description === "string" ? parsed.description : undefined,
+    license: typeof parsed.license === "string" ? parsed.license : undefined,
+    scripts: normalizeStringMap(parsed.scripts),
+    dependencies: normalizeStringMap(parsed.dependencies),
+    devDependencies: normalizeStringMap(parsed.devDependencies)
   };
 }
 
-function normalizeScripts(scripts: Record<string, unknown> | undefined): Record<string, string> {
-  if (!scripts) {
+function normalizeStringMap(value: Record<string, unknown> | undefined): Record<string, string> {
+  if (!value) {
     return {};
   }
 
   return Object.fromEntries(
-    Object.entries(scripts).filter((entry): entry is [string, string] => {
+    Object.entries(value).filter((entry): entry is [string, string] => {
       return typeof entry[1] === "string";
     })
   );
@@ -96,6 +125,16 @@ function hasHeading(content: string, labels: string[]): boolean {
   });
 }
 
+function extractHeadings(content: string): string[] {
+  return [...content.matchAll(/^#{1,6}\s+(.+)$/gm)]
+    .map((match) => match[1].trim())
+    .filter(Boolean);
+}
+
+function hasCommand(content: string, command: "test" | "build"): boolean {
+  return new RegExp(`\\b(?:npm|pnpm|yarn|bun)\\s+(?:run\\s+)?${command}\\b`, "i").test(content);
+}
+
 function countWords(content: string): number {
   const words = content.trim().match(/\S+/g);
   return words ? words.length : 0;
@@ -105,11 +144,20 @@ function emptyReadmeScan(): ReadmeScan {
   return {
     wordCount: 0,
     hasCodeExamples: false,
+    headings: [],
     sections: {
       installation: false,
       usage: false,
       testing: false,
       contributing: false
     }
+  };
+}
+
+function emptyCiScan(): CiScan {
+  return {
+    workflows: [],
+    hasTestCommand: false,
+    hasBuildCommand: false
   };
 }

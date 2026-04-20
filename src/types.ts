@@ -15,7 +15,11 @@ export interface RuleConfig {
 export interface PackageMetadata {
   name?: string;
   version?: string;
+  description?: string;
+  license?: string;
   scripts: Record<string, string>;
+  dependencies: Record<string, string>;
+  devDependencies: Record<string, string>;
 }
 
 export interface ReadmeSections {
@@ -29,6 +33,7 @@ export interface ReadmeScan {
   path?: string;
   wordCount: number;
   hasCodeExamples: boolean;
+  headings: string[];
   sections: ReadmeSections;
 }
 
@@ -40,10 +45,23 @@ export interface RepositoryFiles {
   ciWorkflow: boolean;
 }
 
+export interface CiWorkflowFile {
+  path: string;
+  hasTestCommand: boolean;
+  hasBuildCommand: boolean;
+}
+
+export interface CiScan {
+  workflows: CiWorkflowFile[];
+  hasTestCommand: boolean;
+  hasBuildCommand: boolean;
+}
+
 export interface RepositoryScan {
   targetPath: string;
   files: RepositoryFiles;
   readme: ReadmeScan;
+  ci: CiScan;
   packageJson?: PackageMetadata;
 }
 
