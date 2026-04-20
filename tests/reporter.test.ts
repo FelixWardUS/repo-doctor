@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatHumanReport, formatJsonReport } from "../src/reporter.js";
+import { formatHumanReport, formatJsonReport, formatMarkdownReport } from "../src/reporter.js";
 import type { HealthReport } from "../src/types.js";
 
 const report: HealthReport = {
@@ -61,5 +61,18 @@ describe("reporters", () => {
 
     expect(JSON.parse(output)).toEqual(report);
     expect(output).toContain('\n  "score": 72,\n');
+  });
+
+  it("formats a Markdown report for GitHub summaries and PR comments", () => {
+    const output = formatMarkdownReport(report);
+
+    expect(output).toContain("# Repo Doctor");
+    expect(output).toContain("**Score:** 72/100");
+    expect(output).toContain("| Status | Check | Message |");
+    expect(output).toContain("| PASS | README | README.md exists. |");
+    expect(output).toContain("| WARN | CI workflow | No GitHub Actions workflow found. |");
+    expect(output).toContain("| FAIL | License | No LICENSE file found. |");
+    expect(output).toContain("## Recommendations");
+    expect(output).toContain("- Add a LICENSE file so visitors know how the project can be used.");
   });
 });

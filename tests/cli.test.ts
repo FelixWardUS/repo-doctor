@@ -45,6 +45,26 @@ describe("runCli", () => {
     expect(parsed.checks.map((check: { id: string }) => check.id)).toContain("readme");
   });
 
+  it("prints Markdown when requested", async () => {
+    const stdout: string[] = [];
+
+    const code = await runCli([
+      "node",
+      "repo-doctor",
+      "scan",
+      join(fixturesPath, "healthy-node-repo"),
+      "--format",
+      "markdown"
+    ], {
+      stdout: (value) => stdout.push(value),
+      stderr: () => undefined
+    });
+
+    expect(code).toBe(0);
+    expect(stdout.join("")).toContain("# Repo Doctor");
+    expect(stdout.join("")).toContain("| PASS | README | README.md exists. |");
+  });
+
   it("returns a failing exit code when the score is below the requested threshold", async () => {
     const stdout: string[] = [];
     const stderr: string[] = [];

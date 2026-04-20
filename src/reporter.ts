@@ -28,6 +28,38 @@ export function formatJsonReport(report: HealthReport): string {
   return JSON.stringify(report, null, 2);
 }
 
+export function formatMarkdownReport(report: HealthReport): string {
+  const lines = [
+    "# Repo Doctor",
+    "",
+    `**Target:** \`${report.targetPath}\``,
+    `**Score:** ${report.score}/100`,
+    `**Summary:** ${report.summary.passed} passed, ${report.summary.warned} warned, ${report.summary.failed} failed`,
+    "",
+    "## Checks",
+    "",
+    "| Status | Check | Message |",
+    "| --- | --- | --- |"
+  ];
+
+  for (const check of report.checks) {
+    lines.push(`| ${check.status.toUpperCase()} | ${escapeMarkdownTableCell(check.label)} | ${escapeMarkdownTableCell(check.message)} |`);
+  }
+
+  lines.push("", "## Recommendations", "");
+  if (report.recommendations.length === 0) {
+    lines.push("- No recommendations.");
+  } else {
+    lines.push(...report.recommendations.map((recommendation) => `- ${recommendation}`));
+  }
+
+  return `${lines.join("\n")}\n`;
+}
+
 function formatCheck(check: HealthCheck): string {
   return `[${check.status.toUpperCase()}] ${check.label} - ${check.message}`;
+}
+
+function escapeMarkdownTableCell(value: string): string {
+  return value.replace(/\|/g, "\\|").replace(/\n/g, " ");
 }

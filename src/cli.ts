@@ -5,13 +5,15 @@ import { resolve } from "node:path";
 import { Command, CommanderError, InvalidArgumentError } from "commander";
 import { scanRepository } from "./scanner.js";
 import { evaluateRepository } from "./rules.js";
-import { formatHumanReport, formatJsonReport } from "./reporter.js";
+import { formatHumanReport, formatJsonReport, formatMarkdownReport } from "./reporter.js";
 
 export interface CliIo {
   stdout: (value: string) => void;
   stderr: (value: string) => void;
   cwd?: string;
 }
+
+type ReportFormat = "text" | "json" | "markdown";
 
 export async function runCli(
   argv: string[] = process.argv,
@@ -39,11 +41,13 @@ export async function runCli(
     .description("Scan a repository directory.")
     .argument("[path]", "repository path", ".")
     .option("--json", "print JSON output")
+    .option("--format <format>", "print text, json, or markdown output", parseReportFormat)
     .option("--fail-under <score>", "return exit code 1 when the score is below this threshold", parseScoreThreshold)
-    .action(async (target: string, options: { json?: boolean; failUnder?: number }) => {
+    .action(async (target: string, options: { json?: boolean; format?: ReportFormat; failUnder?: number }) => {
       const scan = await scanRepository(resolve(cwd, target));
       const report = evaluateRepository(scan);
-      const output = options.json ? `${formatJsonReport(report)}\n` : formatHumanReport(report);
+      const format = options.json ? "json" : options.format ?? "text";
+      const output = formatReport(report, format);
       io.stdout(output);
 
       if (typeof options.failUnder === "number" && report.score < options.failUnder) {
@@ -64,6 +68,26 @@ export async function runCli(
     io.stderr(`Error: ${message}\n`);
     return 1;
   }
+}
+
+function formatReport(report: ReturnType<typeof evaluateRepository>, format: ReportFormat): string {
+  if (format === "json") {
+    return `${formatJsonReport(report)}\n`;
+  }
+
+  if (format === "markdown") {
+    return formatMarkdownReport(report);
+  }
+
+  return formatHumanReport(report);
+}
+
+function parseReportFormat(value: string): ReportFormat {
+  if (value === "text" || value === "json" || value === "markdown") {
+    return value;
+  }
+
+  throw new InvalidArgumentError("Expected text, json, or markdown.");
 }
 
 function parseScoreThreshold(value: string): number {
